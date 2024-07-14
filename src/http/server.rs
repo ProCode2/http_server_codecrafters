@@ -4,6 +4,7 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     os::fd::AsFd,
+    thread,
 };
 
 use itertools::Itertools;
@@ -41,8 +42,8 @@ impl Server {
         self.current_stream = None;
     }
 
-    fn read_request(&mut self) -> Result<Request, HTTPError> {
-        let buf_reader = BufReader::new(self.current_stream.as_ref().unwrap());
+    fn read_request(stream: TcpStream) -> Result<Request, HTTPError> {
+        let buf_reader = BufReader::new(stream);
         let mut bytes: Vec<u8> = Vec::new();
         let mut byte_iter = buf_reader.bytes();
         while let Some(byte) = byte_iter.next() {
@@ -55,12 +56,12 @@ impl Server {
         Ok(Request::from(bytes))
     }
 
-    fn return_response(&mut self, res: &[u8]) -> Result<(), std::io::Error> {
-        self.current_stream.as_ref().unwrap().write_all(&res[..])?;
+    fn return_response(mut stream: TcpStream, res: &[u8]) -> Result<(), std::io::Error> {
+        stream.write_all(&res[..])?;
         Ok(())
     }
 
-    fn process_request(&mut self, req: Request) -> Response {
+    fn process_request(req: Request) -> Response {
         if req.get_target() == String::from("/") {
             Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::Ok)
         } else if req.get_target().starts_with("/echo") {
@@ -86,29 +87,28 @@ impl Server {
         }
     }
 
+    fn handle_connection(stream: TcpStream) {
+        println!("Connected to server: Client: {:?}", stream.type_id());
+        let req = Server::read_request(stream.try_clone().unwrap());
+
+        match req {
+            Ok(req) => {
+                let resp = Server::process_request(req);
+                println!("{}", resp);
+                Server::return_response(stream, resp.to_string().as_bytes());
+            }
+            Err(_) => {
+                eprintln!("Error in parsing request");
+            }
+        };
+    }
+
     pub fn run(&mut self) {
         for stream in self.listener.try_clone().unwrap().incoming() {
             match stream {
                 Ok(stream) => {
-                    self.set_stream(stream);
-                    println!(
-                        "Connected to server: Client: {:?}",
-                        self.current_stream.as_ref().unwrap().type_id()
-                    );
-                    let req = self.read_request();
-
-                    match req {
-                        Ok(req) => {
-                            let resp = self.process_request(req);
-                            println!("{}", resp);
-                            self.return_response(resp.to_string().as_bytes());
-                        }
-                        Err(_) => {
-                            eprintln!("Error in parsing request");
-                        }
-                    };
-
-                    self.clear_stream();
+                    thread::spawn(move || Server::handle_connection(stream.try_clone().unwrap()));
+                    ()
                 }
 
                 Err(err) => {

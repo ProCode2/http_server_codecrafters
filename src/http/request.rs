@@ -106,10 +106,12 @@ impl Request {
     fn separate_body_from_request(bytes: &[u8]) -> (Vec<u8>, Vec<u8>) {
         // Find the position of the double CRLF that separates the headers from the body
         let mut headers_end = None;
-        for i in 0..bytes.len() - 3 {
-            if &bytes[i..i + 4] == b"\r\n\r\n" {
-                headers_end = Some(i + 4);
-                break;
+        if bytes.len() >= 3 {
+            for i in 0..bytes.len() - 3 {
+                if &bytes[i..i + 4] == b"\r\n\r\n" {
+                    headers_end = Some(i + 4);
+                    break;
+                }
             }
         }
 
@@ -134,10 +136,11 @@ impl From<Vec<u8>> for Request {
         // seprate body because it may contain not utf8 elements
         // TODO: parse body based on content-type
         let (up_to_header, body) = Request::separate_body_from_request(&bytes[..]);
+
         let mut req = String::from_utf8(up_to_header)
             .unwrap()
             .parse::<Request>()
-            .unwrap();
+            .expect("Can not parse header");
         req.body = Some(RequestBody::String(Vec::from(body)));
         req
     }
