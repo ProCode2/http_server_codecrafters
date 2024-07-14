@@ -12,7 +12,7 @@ use crate::http::request::Request;
 
 use super::{
     error::HTTPError,
-    request::{HTTPVersion, Method, RequestTarget},
+    request::{HTTPVersion, Method, RequestBody, RequestTarget},
     response::{Response, StatusCode},
 };
 
@@ -63,6 +63,14 @@ impl Server {
     fn process_request(&mut self, req: Request) -> Response {
         if req.get_target() == String::from("/") {
             Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::Ok)
+        } else if req.get_target().starts_with("/echo") {
+            let mut headers: HashMap<String, String> = HashMap::new();
+            let content = req.get_target().replace("/echo/", "");
+            headers.insert(String::from("Content-Type"), String::from("text/plain"));
+            headers.insert(String::from("Content-Length"), content.len().to_string());
+            let mut res = Response::new(HTTPVersion::HTTP1_1, headers, StatusCode::Ok);
+            res.set_body(RequestBody::String(content.as_bytes().to_vec()));
+            res
         } else {
             Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound)
         }

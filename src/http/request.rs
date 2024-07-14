@@ -77,6 +77,16 @@ pub enum RequestBody {
     String(Vec<u8>),
 }
 
+impl fmt::Display for RequestBody {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RequestBody::String(bytes) => {
+                write!(f, "{}", String::from_utf8(bytes.clone()).unwrap())
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Request {
     method: Method,

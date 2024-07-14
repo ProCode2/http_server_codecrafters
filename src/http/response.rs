@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use super::request::{HTTPVersion, Method};
+use super::request::{HTTPVersion, Method, RequestBody};
 
 #[derive(Debug)]
 pub enum StatusCode {
@@ -23,6 +23,7 @@ pub struct Response {
     version: HTTPVersion,
     headers: HashMap<String, String>,
     status_code: StatusCode,
+    body: Option<RequestBody>,
 }
 
 impl fmt::Display for Response {
@@ -38,6 +39,11 @@ impl fmt::Display for Response {
         // Write a blank line to separate headers from the body
         write!(f, "\r\n")?;
 
+        if self.body.is_some() {
+            // write the body
+            write!(f, "{}", self.body.as_ref().unwrap().to_string())?;
+        }
+
         Ok(())
     }
 }
@@ -52,6 +58,11 @@ impl Response {
             version,
             headers,
             status_code,
+            body: None,
         }
+    }
+
+    pub fn set_body(&mut self, body: RequestBody) {
+        self.body = Some(body);
     }
 }
