@@ -123,6 +123,10 @@ impl Request {
             (bytes.to_vec(), Vec::new())
         }
     }
+
+    pub fn get_headers(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
 }
 
 impl From<Vec<u8>> for Request {
@@ -142,7 +146,7 @@ impl From<Vec<u8>> for Request {
 impl FromStr for Request {
     type Err = HTTPError;
     fn from_str(s: &str) -> Result<Self, HTTPError> {
-        if let Some((first_line, _)) = s.split_once("\r\n") {
+        if let Some((first_line, rest_of_req)) = s.split_once("\r\n") {
             // build http request
 
             // parse http method
@@ -170,7 +174,20 @@ impl FromStr for Request {
                 }
             };
 
-            let headers = HashMap::new();
+            // parse headers
+            let mut headers = HashMap::new();
+            rest_of_req
+                .split("\r\n")
+                .take_while(|header_line| header_line != &"")
+                .for_each(|header_line| {
+                    let split: Vec<&str> = header_line.split(":").collect();
+                    if split.len() < 2 {
+                        return;
+                    }
+                    let key = split.first().unwrap().trim().to_lowercase().to_string();
+                    let value = split.get(1).unwrap().trim().to_string();
+                    headers.insert(key, value);
+                });
 
             Ok(Self {
                 method,

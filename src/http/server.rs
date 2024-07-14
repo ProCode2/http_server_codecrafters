@@ -70,6 +70,16 @@ impl Server {
             headers.insert(String::from("Content-Length"), content.len().to_string());
             let mut res = Response::new(HTTPVersion::HTTP1_1, headers, StatusCode::Ok);
             res.set_body(RequestBody::String(content.as_bytes().to_vec()));
+
+            res
+        } else if req.get_target() == String::from("/user-agent") {
+            let mut headers: HashMap<String, String> = HashMap::new();
+            let content = req.get_headers().get("user-agent").unwrap();
+            headers.insert(String::from("Content-Type"), String::from("text/plain"));
+            headers.insert(String::from("Content-Length"), content.len().to_string());
+            let mut res = Response::new(HTTPVersion::HTTP1_1, headers, StatusCode::Ok);
+            res.set_body(RequestBody::String(content.as_bytes().to_vec()));
+
             res
         } else {
             Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound)
