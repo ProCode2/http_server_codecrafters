@@ -1,9 +1,13 @@
 use std::{
     any::Any,
     collections::HashMap,
+    env, fs,
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     os::fd::AsFd,
+    path,
+    str::FromStr,
+    sync::Arc,
     thread,
 };
 
@@ -82,6 +86,26 @@ impl Server {
             res.set_body(RequestBody::String(content.as_bytes().to_vec()));
 
             res
+        } else if req.get_target().starts_with("/files") {
+            let dir = env::args().last().unwrap_or("/tmp/".to_string());
+
+            let file_name = req.get_target().replace("/files/", "");
+            let p = path::PathBuf::from(format!("{}{}", &dir, &file_name));
+
+            let mut headers: HashMap<String, String> = HashMap::new();
+            if p.exists() && p.is_file() {
+                let content = fs::read_to_string(p).unwrap_or("".to_string());
+                headers.insert(
+                    String::from("Content-Type"),
+                    String::from("application/octet-stream"),
+                );
+                headers.insert(String::from("Content-Length"), content.len().to_string());
+                let mut res = Response::new(HTTPVersion::HTTP1_1, headers, StatusCode::Ok);
+                res.set_body(RequestBody::String(content.as_bytes().to_vec()));
+                res
+            } else {
+                Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound)
+            }
         } else {
             Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound)
         }
@@ -94,7 +118,6 @@ impl Server {
         match req {
             Ok(req) => {
                 let resp = Server::process_request(req);
-                println!("{}", resp);
                 Server::return_response(stream, resp.to_string().as_bytes());
             }
             Err(_) => {
