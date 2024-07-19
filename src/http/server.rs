@@ -95,7 +95,9 @@ impl Server {
                     }
                 }
 
-                headers.insert("Content-Type".to_string(), "text/plain".to_string());
+                headers
+                    .entry("Content-Type".to_string())
+                    .or_insert("text/plain".to_string());
                 res.set_headers(headers);
                 res
             }
