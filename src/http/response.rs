@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use super::request::{HTTPVersion, Method, RequestBody};
+use super::request::{HTTPVersion, RequestBody};
 
 #[derive(Debug)]
 pub enum StatusCode {
     Ok,
+    Created,
     NotFound,
 }
 
@@ -14,6 +15,7 @@ impl fmt::Display for StatusCode {
         match self {
             StatusCode::Ok => write!(f, "200 OK"),
             StatusCode::NotFound => write!(f, "404 Not Found"),
+            StatusCode::Created => write!(f, "201 Created"),
         }
     }
 }

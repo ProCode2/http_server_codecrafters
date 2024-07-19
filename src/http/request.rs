@@ -1,25 +1,11 @@
 use super::error::HTTPError;
 use std::fmt;
 use std::{collections::HashMap, result::Result, str::FromStr};
-/**
-
-// Request line
-GET                          // HTTP method
-/index.html                  // Request target
-HTTP/1.1                     // HTTP version
-\r\n                         // CRLF that marks the end of the request line
-
-// Headers
-Host: localhost:4221\r\n     // Header that specifies the server's host and port
-User-Agent: curl/7.64.1\r\n  // Header that describes the client's user agent
-Accept: \r\n              // Header that specifies which media types the client can accept
-\r\n                         // CRLF that marks the end of the headers
-
-// Request body (empty)**/
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Method {
     GET,
+    POST,
     UNKNOWN,
 }
 
@@ -27,6 +13,7 @@ impl From<&str> for Method {
     fn from(s: &str) -> Self {
         match s {
             "GET" => Method::GET,
+            "POST" => Method::POST,
             _ => Method::UNKNOWN,
         }
     }
@@ -70,7 +57,7 @@ impl From<&str> for RequestTarget {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestBody {
     String(Vec<u8>),
 }
@@ -104,6 +91,14 @@ impl Request {
 
     pub fn get_method(&self) -> Method {
         self.method
+    }
+
+    pub fn get_body(&self) -> Option<RequestBody> {
+        self.body.clone()
+    }
+
+    pub fn set_body(&mut self, b: RequestBody) {
+        self.body = Some(b);
     }
 
     pub fn set_params(&mut self, params: HashMap<String, String>) {
@@ -152,6 +147,18 @@ impl From<Vec<u8>> for Request {
             .unwrap()
             .parse::<Request>()
             .expect("Can not parse header");
+
+        // read body based on Content-Length property
+        // let headers = req.get_headers();
+        // let length = match headers
+        //     .get("content-length")
+        //     .unwrap_or(&String::new())
+        //     .parse::<usize>()
+        // {
+        //     Ok(l) => l,
+        //     Err(_) => 0,
+        // };
+        println!("{:?}", body);
         req.body = Some(RequestBody::String(Vec::from(body)));
         req
     }

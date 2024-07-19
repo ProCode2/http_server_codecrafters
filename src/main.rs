@@ -62,6 +62,30 @@ fn main() -> Result<(), std::io::Error> {
         }
     });
 
+    server.add_route(http::Method::POST, "/files/{file_name}", |req: &Request| {
+        let dir = env::args().last().unwrap_or("/tmp/".to_string());
+
+        let params = req.get_params();
+        let d = String::new();
+        let file_name = params.get("file_name").unwrap_or(&d);
+        let p = path::PathBuf::from(format!("{}{}", &dir, &file_name));
+        let body = req.get_body();
+        if let Some(body) = body {
+            match body {
+                RequestBody::String(bytes) => match fs::write(p, bytes) {
+                    Ok(_) => {
+                        Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::Created)
+                    }
+                    Err(_) => {
+                        Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound)
+                    }
+                },
+            }
+        } else {
+            Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound)
+        }
+    });
+
     server.run();
 
     Ok(())

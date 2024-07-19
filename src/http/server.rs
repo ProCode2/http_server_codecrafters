@@ -51,7 +51,25 @@ impl Server {
             }
             bytes.push(byte.unwrap());
         }
-        Ok(Request::from(bytes))
+        let mut req = Request::from(bytes);
+
+        // read body based on Content-Length property
+        let headers = req.get_headers();
+        let length = match headers
+            .get("content-length")
+            .unwrap_or(&String::new())
+            .parse::<usize>()
+        {
+            Ok(l) => l,
+            Err(_) => 0,
+        };
+
+        let body_bytes = byte_iter
+            .take(length)
+            .map(|x| x.unwrap())
+            .collect::<Vec<u8>>();
+        req.set_body(RequestBody::String(Vec::from(body_bytes)));
+        Ok(req)
     }
 
     fn return_response(mut stream: TcpStream, res: &[u8]) -> Result<(), std::io::Error> {

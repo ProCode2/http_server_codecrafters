@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use itertools::Itertools;
+
 use super::{
     request::{Method, Request},
     response::Response,
@@ -62,7 +64,6 @@ impl Router {
         }
 
         current_node.handlers.insert(method, Box::new(f));
-        println!("Here {:?}", current_node.handlers.keys());
     }
 
     pub fn get_handler_and_params(
@@ -71,24 +72,25 @@ impl Router {
         origin_form: &str,
     ) -> (HashMap<String, String>, Option<&Handler>) {
         let segments = origin_form.split('/').filter(|s| !s.is_empty());
-        println!("SEGMENTS: {:?}", segments.clone().collect::<Vec<&str>>());
         let mut current_node = &self.root;
         let mut params = HashMap::new();
-        for segment in segments {
+        let segs = segments.clone();
+        for (i, segment) in segments.enumerate() {
             if let Some(next_node) = current_node.children.get(segment) {
-                println!("FOUND {:#?}", next_node.param);
                 current_node = next_node;
             } else if let Some(p) = current_node.param.as_ref() {
-                params.insert(p.clone(), segment.to_string());
+                params.insert(
+                    p.clone(),
+                    segs.clone().collect::<Vec<&str>>()[i..]
+                        .join("/")
+                        .to_string(),
+                );
 
                 if let Some(next_node) = current_node.children.get("{param}") {
-                    println!("FOUND {:?}", current_node.children);
                     current_node = next_node;
                 } else {
                     break;
                 }
-            } else {
-                return (params, None);
             }
         }
 
