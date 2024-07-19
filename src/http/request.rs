@@ -1,8 +1,6 @@
-use tokio::io::AsyncBufReadExt;
-
 use super::error::HTTPError;
 use std::fmt;
-use std::{collections::HashMap, io::BufRead, result::Result, str::FromStr};
+use std::{collections::HashMap, result::Result, str::FromStr};
 /**
 
 // Request line
@@ -19,7 +17,7 @@ Accept: \r\n              // Header that specifies which media types the client 
 
 // Request body (empty)**/
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Method {
     GET,
     UNKNOWN,
@@ -94,6 +92,7 @@ pub struct Request {
     version: HTTPVersion,
     headers: HashMap<String, String>,
     body: Option<RequestBody>,
+    params: HashMap<String, String>,
 }
 
 impl Request {
@@ -101,6 +100,18 @@ impl Request {
         match &self.target {
             RequestTarget::OriginForm(s) => s.to_owned(),
         }
+    }
+
+    pub fn get_method(&self) -> Method {
+        self.method
+    }
+
+    pub fn set_params(&mut self, params: HashMap<String, String>) {
+        self.params = params;
+    }
+
+    pub fn get_params(&self) -> HashMap<String, String> {
+        self.params.clone()
     }
 
     fn separate_body_from_request(bytes: &[u8]) -> (Vec<u8>, Vec<u8>) {
@@ -198,6 +209,7 @@ impl FromStr for Request {
                 version,
                 headers,
                 body: None,
+                params: HashMap::new(),
             })
         } else {
             Err(HTTPError::Custom)

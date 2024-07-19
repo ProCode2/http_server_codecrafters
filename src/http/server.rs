@@ -2,48 +2,42 @@ use std::{
     any::Any,
     collections::HashMap,
     env, fs,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufReader, Read, Write},
     net::{TcpListener, TcpStream},
-    os::fd::AsFd,
     path,
-    str::FromStr,
-    sync::Arc,
+    sync::{Arc, Mutex},
     thread,
 };
-
-use itertools::Itertools;
 
 use crate::http::request::Request;
 
 use super::{
     error::HTTPError,
-    request::{HTTPVersion, Method, RequestBody, RequestTarget},
+    request::{HTTPVersion, RequestBody},
     response::{Response, StatusCode},
+    router::Router,
+    Method,
 };
 
 #[derive(Debug)]
 pub struct Server {
     listener: TcpListener,
-    current_stream: Option<TcpStream>,
+    pub router: Arc<Mutex<Router>>,
 }
 
 impl Server {
     pub fn new(addr: &str) -> Result<Self, std::io::Error> {
         let listener = TcpListener::bind(addr)?;
         println!("Started listening from the server");
-
-        Ok(Self {
-            listener,
-            current_stream: None,
-        })
+        let router = Arc::new(Mutex::new(Router::new()));
+        Ok(Self { listener, router })
     }
 
-    fn set_stream(&mut self, stream: TcpStream) {
-        self.current_stream = Some(stream);
-    }
-
-    fn clear_stream(&mut self) {
-        self.current_stream = None;
+    pub fn add_route<F>(&self, method: Method, p: &str, f: F)
+    where
+        F: Fn(&Request) -> Response + 'static + Send + Sync,
+    {
+        self.router.lock().unwrap().add_route(method, p, f);
     }
 
     fn read_request(stream: TcpStream) -> Result<Request, HTTPError> {
@@ -65,59 +59,23 @@ impl Server {
         Ok(())
     }
 
-    fn process_request(req: Request) -> Response {
-        if req.get_target() == String::from("/") {
-            Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::Ok)
-        } else if req.get_target().starts_with("/echo") {
-            let mut headers: HashMap<String, String> = HashMap::new();
-            let content = req.get_target().replace("/echo/", "");
-            headers.insert(String::from("Content-Type"), String::from("text/plain"));
-            headers.insert(String::from("Content-Length"), content.len().to_string());
-            let mut res = Response::new(HTTPVersion::HTTP1_1, headers, StatusCode::Ok);
-            res.set_body(RequestBody::String(content.as_bytes().to_vec()));
-
-            res
-        } else if req.get_target() == String::from("/user-agent") {
-            let mut headers: HashMap<String, String> = HashMap::new();
-            let content = req.get_headers().get("user-agent").unwrap();
-            headers.insert(String::from("Content-Type"), String::from("text/plain"));
-            headers.insert(String::from("Content-Length"), content.len().to_string());
-            let mut res = Response::new(HTTPVersion::HTTP1_1, headers, StatusCode::Ok);
-            res.set_body(RequestBody::String(content.as_bytes().to_vec()));
-
-            res
-        } else if req.get_target().starts_with("/files") {
-            let dir = env::args().last().unwrap_or("/tmp/".to_string());
-
-            let file_name = req.get_target().replace("/files/", "");
-            let p = path::PathBuf::from(format!("{}{}", &dir, &file_name));
-
-            let mut headers: HashMap<String, String> = HashMap::new();
-            if p.exists() && p.is_file() {
-                let content = fs::read_to_string(p).unwrap_or("".to_string());
-                headers.insert(
-                    String::from("Content-Type"),
-                    String::from("application/octet-stream"),
-                );
-                headers.insert(String::from("Content-Length"), content.len().to_string());
-                let mut res = Response::new(HTTPVersion::HTTP1_1, headers, StatusCode::Ok);
-                res.set_body(RequestBody::String(content.as_bytes().to_vec()));
-                res
-            } else {
-                Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound)
-            }
-        } else {
-            Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound)
+    fn process_request(mut req: Request, router: &Router) -> Response {
+        let (params, handler) =
+            router.get_handler_and_params(req.get_method(), req.get_target().as_str());
+        req.set_params(params);
+        match handler {
+            Some(h) => h(&req),
+            None => Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound),
         }
     }
 
-    fn handle_connection(stream: TcpStream) {
+    fn handle_connection(stream: TcpStream, router: Arc<Mutex<Router>>) {
         println!("Connected to server: Client: {:?}", stream.type_id());
         let req = Server::read_request(stream.try_clone().unwrap());
 
         match req {
             Ok(req) => {
-                let resp = Server::process_request(req);
+                let resp = Server::process_request(req, &Arc::clone(&router).lock().unwrap());
                 Server::return_response(stream, resp.to_string().as_bytes());
             }
             Err(_) => {
@@ -128,9 +86,12 @@ impl Server {
 
     pub fn run(&mut self) {
         for stream in self.listener.try_clone().unwrap().incoming() {
+            let router = Arc::clone(&self.router);
             match stream {
                 Ok(stream) => {
-                    thread::spawn(move || Server::handle_connection(stream.try_clone().unwrap()));
+                    thread::spawn(move || {
+                        Server::handle_connection(stream.try_clone().unwrap(), router)
+                    });
                     ()
                 }
 
