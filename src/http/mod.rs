@@ -1,3 +1,4 @@
+mod encoding;
 mod error;
 mod request;
 mod response;
@@ -5,6 +6,7 @@ mod router;
 mod server;
 // pub use error::HTTPError;
 // pub use request::Request;
+pub use encoding::*;
 pub use request::Method;
 pub use request::*;
 pub use response::*;

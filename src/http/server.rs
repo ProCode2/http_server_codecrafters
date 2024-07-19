@@ -16,7 +16,7 @@ use super::{
     request::{HTTPVersion, RequestBody},
     response::{Response, StatusCode},
     router::Router,
-    Method,
+    Encoding, Method,
 };
 
 #[derive(Debug)]
@@ -82,7 +82,23 @@ impl Server {
             router.get_handler_and_params(req.get_method(), req.get_target().as_str());
         req.set_params(params);
         match handler {
-            Some(h) => h(&req),
+            Some(h) => {
+                let mut res = h(&req);
+                let h = req.get_headers();
+                let mut headers = res.get_headers();
+                let d = String::new();
+                if h.get("accept-encoding").is_some() {
+                    let encoding_str = h.get("accept-encoding").unwrap_or(&d);
+                    let encoding = Encoding::get_endoing_scheme(encoding_str);
+                    if let Some(enc) = encoding {
+                        headers.insert("Content-Encoding".to_string(), enc.to_string());
+                    }
+                }
+
+                headers.insert("Content-Type".to_string(), "text/plain".to_string());
+                res.set_headers(headers);
+                res
+            }
             None => Response::new(HTTPVersion::HTTP1_1, HashMap::new(), StatusCode::NotFound),
         }
     }

@@ -67,4 +67,12 @@ impl Response {
     pub fn set_body(&mut self, body: RequestBody) {
         self.body = Some(body);
     }
+
+    pub fn get_headers(&self) -> HashMap<String, String> {
+        self.headers.clone()
+    }
+
+    pub fn set_headers(&mut self, h: HashMap<String, String>) {
+        self.headers = h;
+    }
 }
