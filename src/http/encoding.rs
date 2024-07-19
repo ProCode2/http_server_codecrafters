@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 #[derive(Debug, Clone)]
 pub enum EncodingType {
     Gzip(f32),
@@ -28,7 +30,7 @@ impl std::fmt::Display for Encoding {
 impl Encoding {
     pub fn get_endoing_scheme(s: &str) -> Option<Encoding> {
         // gzip;q=1.0, deflate
-        let encodings = s.split(",").take_while(|x| !x.is_empty()).map(|x| x.trim());
+        let encodings = s.split(",").filter(|x| !x.is_empty()).map(|x| x.trim());
         let encodings = encodings
             .map(|enc| {
                 let enc_type = if let Some((enc_type, q)) = enc.split_once(";") {
@@ -48,8 +50,9 @@ impl Encoding {
                     None
                 }
             })
-            .take_while(|x| x.is_some()) // only accept supported compression techniques
+            .filter(|x| x.is_some()) // only accept supported compression techniques
             .collect::<Vec<Option<Encoding>>>();
+
         let result = encodings.first();
         match result {
             Some(x) => x.clone(),
