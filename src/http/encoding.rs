@@ -48,7 +48,7 @@ impl Encoding {
                     None
                 }
             })
-            .take_while(|x| x.is_some())
+            .take_while(|x| x.is_some()) // only accept supported compression techniques
             .collect::<Vec<Option<Encoding>>>();
         let result = encodings.first();
         match result {
