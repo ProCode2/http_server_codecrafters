@@ -41,10 +41,7 @@ impl fmt::Display for Response {
         // Write a blank line to separate headers from the body
         write!(f, "\r\n")?;
 
-        if self.body.is_some() {
-            // write the body
-            write!(f, "{}", self.body.as_ref().unwrap().to_string())?;
-        }
+        // the body is added as bytes when sent to client
 
         Ok(())
     }
@@ -62,6 +59,10 @@ impl Response {
             status_code,
             body: None,
         }
+    }
+
+    pub fn get_body(&self) -> Option<RequestBody> {
+        self.body.clone()
     }
 
     pub fn set_body(&mut self, body: RequestBody) {

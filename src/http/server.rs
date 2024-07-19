@@ -1,15 +1,16 @@
+use bytes::Buf;
+use flate2::Compression;
 use std::{
     any::Any,
     collections::HashMap,
-    env, fs,
     io::{BufReader, Read, Write},
     net::{TcpListener, TcpStream},
-    path,
     sync::{Arc, Mutex},
     thread,
 };
 
 use crate::http::request::Request;
+use flate2::write::GzEncoder;
 
 use super::{
     error::HTTPError,
@@ -88,10 +89,26 @@ impl Server {
                 let mut headers = res.get_headers();
                 let d = String::new();
                 if h.get("accept-encoding").is_some() {
-                    let encoding_str = h.get("accept-encoding").unwrap_or(&d);
-                    let encoding = Encoding::get_endoing_scheme(encoding_str);
-                    if let Some(enc) = encoding {
-                        headers.insert("Content-Encoding".to_string(), enc.to_string());
+                    let body = res.get_body();
+
+                    let body_buf = match body {
+                        Some(RequestBody::String(bytes)) => bytes,
+                        None => Vec::new(),
+                    };
+                    let mut encoder = GzEncoder::new(vec![], Compression::default());
+
+                    encoder.write_all(&body_buf);
+
+                    let compressed_buf = encoder.finish();
+
+                    if let Ok(cp) = compressed_buf {
+                        headers.insert("Content-Length".to_string(), cp.len().to_string());
+                        let encoding_str = h.get("accept-encoding").unwrap_or(&d);
+                        let encoding = Encoding::get_endoing_scheme(encoding_str);
+                        if let Some(enc) = encoding {
+                            headers.insert("Content-Encoding".to_string(), enc.to_string());
+                        }
+                        res.set_body(RequestBody::String(cp));
                     }
                 }
 
@@ -112,7 +129,18 @@ impl Server {
         match req {
             Ok(req) => {
                 let resp = Server::process_request(req, &Arc::clone(&router).lock().unwrap());
-                Server::return_response(stream, resp.to_string().as_bytes());
+                let body = resp.get_body();
+                match body {
+                    Some(RequestBody::String(bytes)) => {
+                        Server::return_response(
+                            stream,
+                            &[resp.to_string().as_bytes(), &bytes[..]].concat(),
+                        );
+                    }
+                    None => {
+                        Server::return_response(stream, resp.to_string().as_bytes());
+                    }
+                }
             }
             Err(_) => {
                 eprintln!("Error in parsing request");
