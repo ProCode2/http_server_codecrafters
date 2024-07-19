@@ -87,10 +87,16 @@ impl Router {
                 );
 
                 if let Some(next_node) = current_node.children.get("{param}") {
-                    current_node = next_node;
+                    if let Some(handler) = next_node.handlers.get(&method) {
+                        return (params, Some(handler));
+                    } else {
+                        return (params, None);
+                    }
                 } else {
                     break;
                 }
+            } else {
+                return (params, None);
             }
         }
 

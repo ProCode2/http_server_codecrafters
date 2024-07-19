@@ -148,17 +148,6 @@ impl From<Vec<u8>> for Request {
             .parse::<Request>()
             .expect("Can not parse header");
 
-        // read body based on Content-Length property
-        // let headers = req.get_headers();
-        // let length = match headers
-        //     .get("content-length")
-        //     .unwrap_or(&String::new())
-        //     .parse::<usize>()
-        // {
-        //     Ok(l) => l,
-        //     Err(_) => 0,
-        // };
-        println!("{:?}", body);
         req.body = Some(RequestBody::String(Vec::from(body)));
         req
     }
